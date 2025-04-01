@@ -9,19 +9,27 @@ st.title("PDF Drawing Title Extractor")
 uploaded_pdfs = st.file_uploader("Upload one or more PDF files", type="pdf", accept_multiple_files=True)
 
 if st.button("Process PDFs"):
-    if not folder:
-        st.warning("Please enter a folder path.")
+    if not uploaded_pdfs:
+        st.warning("Please upload PDF files.")
     else:
-        folder_path = Path(folder)
-        if not folder_path.exists() or not folder_path.is_dir():
-            st.error("The provided path is invalid or does not exist.")
-        else:
-            with st.spinner("Processing..."):
-                df, output_file = pp.process_pdfs(folder_path)
-                if df is not None:
-                    st.success(f"✅ Processed! Saved to: {output_file}")
-                    st.dataframe(df)
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button("Download as CSV", data=csv, file_name="Processed_PDF_Metadata.csv")
-                else:
-                    st.error("No valid PDFs were processed.")
+        with st.spinner("Processing..."):
+            extracted_data = []
+            for uploaded_pdf in uploaded_pdfs:
+                # Save temporarily
+                with open(uploaded_pdf.name, "wb") as f:
+                    f.write(uploaded_pdf.getbuffer())
+
+                # Process using your existing logic
+                metadata = pp.parse_filename(uploaded_pdf.name)
+                if metadata:
+                    metadata["Drawing Title"] = pp.extract_drawing_title_ocr(uploaded_pdf.name)
+                    extracted_data.append(metadata)
+
+            if extracted_data:
+                df = pd.DataFrame(extracted_data)
+                st.success("✅ PDFs processed!")
+                st.dataframe(df)
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("Download CSV", data=csv, file_name="Processed_PDF_Metadata.csv")
+            else:
+                st.error("❌ No valid PDFs found.")
