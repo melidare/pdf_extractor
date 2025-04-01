@@ -7,8 +7,9 @@ import pandas as pd
 from pathlib import Path
 
 # Set Tesseract OCR path (IMPORTANT: This will only work locally, for deployment you need system path setup)
-# Automatically use system-installed Tesseract
-pytesseract.pytesseract.tesseract_cmd = 'tesseract'
+
+# Explicitly set Render's typical path for tesseract
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 def extract_drawing_title_ocr(pdf_path):
     """Extracts OCR text from the exact location of 'Drawing Title'."""
