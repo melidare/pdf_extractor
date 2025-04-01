@@ -12,7 +12,7 @@ from pathlib import Path
 # Explicitly set Render's typical path for tesseract
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-# Keywords to detect (lowercase comparison)
+# Keywords that must begin the drawing title (case insensitive)
 KEYWORDS = [
     'house', 'duplex', 'block', 'rc', 'road', 'watermain', 'typical', 'combined',
     'proposed', 'foul', 'drainage', 'surface', 'wastewater', 'roads', 'swept',
@@ -21,34 +21,53 @@ KEYWORDS = [
     'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'
 ]
 
+def safe_crop(gray, x_start, y_start, x_end, y_end):
+    h, w = gray.shape
+    x_start = min(x_start, w - 1)
+    y_start = min(y_start, h - 1)
+    x_end = min(x_end, w)
+    y_end = min(y_end, h)
+
+    # Ensure valid window
+    if x_end <= x_start:
+        x_end = x_start + 1
+    if y_end <= y_start:
+        y_end = y_start + 1
+
+    return gray[y_start:y_end, x_start:x_end]
+
 def extract_drawing_title_ocr(pdf_path):
     try:
         doc = fitz.open(pdf_path)
         page = doc[0]
         pix = page.get_pixmap()
-        
-        # Convert to image
         img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # ✅ Enlarge the scanning window but still cropped
-        x_start, y_start, x_end, y_end = 1500, 1565, 2200, 1600  # Your values
-        cropped = gray[y_start:y_end, x_start:x_end]
+        # Define two windows
+        window_A = (1500, 1565, 2200, 1600)
+        window_B = (2000, 1300, gray.shape[1], gray.shape[0])  # x_end=w, y_end=h
 
-        # ✅ OCR the cropped window
-        text = pytesseract.image_to_string(cropped)
-        lines = text.splitlines()
+        # Try Window A first
+        for window in [window_A, window_B]:
+            x_start, y_start, x_end, y_end = window
+            cropped = safe_crop(gray, x_start, y_start, x_end, y_end)
 
-        # ✅ Filter lines by keywords (case-insensitive)
-        for line in lines:
-            if any(keyword in line.lower() for keyword in KEYWORDS):
-                return line.strip()
+            # OCR and process
+            text = pytesseract.image_to_string(cropped)
+            lines = text.splitlines()
+
+            for line in lines:
+                words = line.strip().lower().split()
+                if not words:
+                    continue
+                if any(word in KEYWORDS for word in words[:3]):
+                    return line.strip()
 
         return "Drawing Title Not Found"
 
     except Exception as e:
         return f"Error extracting OCR text: {e}"
-
 
 def parse_filename(filename):
     """Extracts structured metadata from the filename."""
