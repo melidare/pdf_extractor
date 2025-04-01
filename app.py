@@ -6,7 +6,7 @@ st.set_page_config(page_title="PDF Drawing Title Extractor", layout="wide")
 
 st.title("PDF Drawing Title Extractor")
 
-folder = st.text_input("Enter the absolute path to the folder containing PDFs")
+uploaded_pdfs = st.file_uploader("Upload one or more PDF files", type="pdf", accept_multiple_files=True)
 
 if st.button("Process PDFs"):
     if not folder:
