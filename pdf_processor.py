@@ -21,19 +21,18 @@ KEYWORDS = [
     'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'
 ]
 
+MAX_LINES = 2  # Maximum number of lines to merge if a match is found
+
 def safe_crop(gray, x_start, y_start, x_end, y_end):
     h, w = gray.shape
     x_start = min(x_start, w - 1)
     y_start = min(y_start, h - 1)
     x_end = min(x_end, w)
     y_end = min(y_end, h)
-
-    # Ensure valid window
     if x_end <= x_start:
         x_end = x_start + 1
     if y_end <= y_start:
         y_end = y_start + 1
-
     return gray[y_start:y_end, x_start:x_end]
 
 def extract_drawing_title_ocr(pdf_path):
@@ -44,25 +43,32 @@ def extract_drawing_title_ocr(pdf_path):
         img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # Define two windows
-        window_A = (1500, 1565, 2200, 1600)
-        window_B = (2000, 1300, gray.shape[1], gray.shape[0])  # x_end=w, y_end=h
+        # Define both windows
+        windows = [
+            (1500, 1565, 2200, 1600),                # Window A
+            (2000, 1300, gray.shape[1], gray.shape[0])  # Window B
+        ]
 
-        # Try Window A first
-        for window in [window_A, window_B]:
+        for window in windows:
             x_start, y_start, x_end, y_end = window
             cropped = safe_crop(gray, x_start, y_start, x_end, y_end)
 
-            # OCR and process
+            # OCR the cropped region
             text = pytesseract.image_to_string(cropped)
             lines = text.splitlines()
 
-            for line in lines:
+            # Search for matching lines
+            for i, line in enumerate(lines):
                 words = line.strip().lower().split()
                 if not words:
                     continue
                 if any(word in KEYWORDS for word in words[:3]):
-                    return line.strip()
+                    # Combine up to MAX_LINES following lines
+                    combined_line = line.strip()
+                    for j in range(1, MAX_LINES):
+                        if i + j < len(lines):
+                            combined_line += " " + lines[i + j].strip()
+                    return combined_line.strip()
 
         return "Drawing Title Not Found"
 
